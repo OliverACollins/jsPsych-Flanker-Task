@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sussex - Research</title>
+
+    <!-- jsPsych -->
+    <script src="https://unpkg.com/jspsych@8.2.2"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-fullscreen@2.0.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-survey@2.0.0"></script>
+
+    <link href="https://unpkg.com/jspsych@8.0.1/css/jspsych.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="https://unpkg.com/@jspsych/plugin-survey@2.0.0/css/survey.css" />
+
+    <script src="flanker.js"></script>
+
+</head>
+
+<body></body>
+
+<script>
+
+// enter participant ID
+var participant_ID = {
+    type: jsPsychSurvey,
+    survey_json: {
+        title: "About yourself",
+        completeText: "Continue",
+        pageNextText: "Next",
+        pagePrevText: "Previous",
+        goNextPageAutomatic: false,
+        showQuestionNumbers: false,
+        on_start: function () {
+            jsPsych.progressBar.progress = 0.0
+        },
+        pages: [
+            {
+                elements: [
+                    {
+                        title: "Enter the participant's ID:",
+                        type: "text",
+                        placeholder: "P000",
+                        name: "Participant_ID",
+                        isRequired: true,
+                    },
+                ],
+            },
+        ],
+    },
+    data: {
+        screen: "ppt_id_ig",
+    },
+}
+
+// initialise jsPsych + create timeline
+var jsPsych = initJsPsych({
+        show_progress_bar: false,
+        message_progress_bar: "Progress",
+    on_finish: function () {
+        // Get participant ID
+        let participantID = jsPsych.data
+            .get()
+            .filter({ screen: "ppt_id_ig" })
+            .values()[0].response["Participant_ID"]
+
+        // Save as JSON file locally
+        jsPsych.data.get().localSave("json", `${participantID}_flanker.json`)
+        jsPsych.data.get().localSave("csv", `${participantID}_flanker.csv`) // CSV may be unnecessary
+    },
+})
+
+var timeline = [];
+
+
+// welcome message
+var welcome = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: "<h3><b>jsPsych Breathing Exercises Implementation</b></h3> <p>Press any key to begin</p>",
+    choices: [" "]
+};
+
+// fullscreen on
+var fullscreen_on = {
+    type: jsPsychFullscreen,
+    fullscreen_mode: true,
+    message: "<p>The experiment will switch to full screen mode when you press the button below</p>",
+    button_label: "Continue"
+};
+
+timeline.push(participant_ID)
+timeline.push(fullscreen_on)
+timeline.push(instructions)
+
+// practice trials
+timeline.push(make_block('practice', 4))
+timeline.push(make_block_finish('practice'))
+
+timeline.push(begin)
+
+// experimental blocks, each followed by its results screen
+var n_blocks = 4;
+for (var b = 1; b <= n_blocks; b++) {
+    timeline.push(make_block(b, 10));
+    timeline.push(make_block_finish(b, b === n_blocks));
+}
+
+// run the experiment
+jsPsych.run(timeline);
+
+</script>
+</html>
