@@ -7,13 +7,16 @@
     <script src="https://unpkg.com/jspsych@8.2.2"></script>
     <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-image-keyboard-response@2.1.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-fullscreen@2.0.0"></script>
     <script src="https://unpkg.com/@jspsych/plugin-survey@2.0.0"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-preload@2.1.0"></script>
 
     <link href="https://unpkg.com/jspsych@8.0.1/css/jspsych.css" rel="stylesheet" type="text/css" />
     <link rel="stylesheet" href="https://unpkg.com/@jspsych/plugin-survey@2.0.0/css/survey.css" />
 
     <script src="flanker.js"></script>
+    <script src="parameters.js"></script>
 
 </head>
 
@@ -93,7 +96,7 @@ timeline.push(fullscreen_on)
 timeline.push(instructions)
 
 // practice trials
-timeline.push(make_block('practice', 4))
+timeline.push(make_block('practice', 6))
 timeline.push(make_block_finish('practice'))
 
 timeline.push(begin)
@@ -107,6 +110,16 @@ for (var b = 1; b <= n_blocks; b++) {
 
 // run the experiment
 jsPsych.run(timeline);
+
+// Run: first sync then start experiment =================================================================
+syncLSL()
+    .then(function () {
+        startExperiment()
+    })
+    .catch(function (err) {
+        console.warn("Proceeding without LSL sync (sync failed):", err)
+        startExperiment()
+    })
 
 </script>
 </html>

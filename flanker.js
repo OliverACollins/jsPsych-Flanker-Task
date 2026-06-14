@@ -1,3 +1,58 @@
+// -----------------------
+// LSL bridge (promise-based)
+// -----------------------
+var lslBaseTime = null
+
+function syncLSL() {
+    return new Promise(async function (resolve, reject) {
+        try {
+            let offsets = []
+            for (let i = 0; i < 3; i++) {
+                var startPerf = performance.now()
+                let resp = await fetch("http://192.168.46.216:5000/sync", { cache: "no-store" }) // change IPv4 address as appropriate
+                let text = await resp.text()
+                var lslTime = parseFloat(text)
+                var endPerf = performance.now()
+                var perfMid = (startPerf + endPerf) / 2
+                offsets.push(lslTime - perfMid / 1000)
+                await new Promise((r) => setTimeout(r, 100)) // Short delay between syncs
+            }
+            lslBaseTime = offsets.reduce((a, b) => a + b, 0) / offsets.length
+            console.log("LSL sync done (averaged):", lslBaseTime)
+            resolve(lslBaseTime)
+        } catch (e) {
+            console.error("LSL sync exception:", e)
+            reject(e)
+        }
+    })
+}
+
+function sendMarker(value = "1") {
+    // If not synced, still send marker (server will timestamp with local_clock())
+    if (lslBaseTime === null) {
+        console.warn("LSL not synced yet - sending without JS timestamp")
+        fetch("http://192.168.46.216:5000/marker?value=" + encodeURIComponent(value)) // change IPv4 address as appropriate
+            .then(function () {
+                console.log("sent marker (no-ts)", value)
+            })
+            .catch(function (err) {
+                console.error("Marker send error:", err)
+            })
+        return
+    }
+
+    var ts = lslBaseTime + performance.now() / 1000
+    var url = "http://192.168.46.216:5000/marker?value=" + encodeURIComponent(value) + "&ts=" + encodeURIComponent(ts) // change IPv4 address as appropriate
+    fetch(url)
+        .then(function () {
+            console.log("sent marker", value, "ts", ts)
+        })
+        .catch(function (err) {
+            console.error("Marker send error:", err)
+        })
+}
+
+
 var instructions = {
     type: jsPsychHtmlButtonResponse,
     choices: ["Continue"],
@@ -5,11 +60,15 @@ var instructions = {
     stimulus:`
     <h2><b>Arrow Task</b></h2>
         <p>In this task, you will see <b>5 arrows</b> presented on the screen, such as like this:</p>
-        <p style="font-size: 100px;">  <  <  <  <  <  </p>
-        <p>When the <b>MIDDLE arrow</b> points to the <b>left (<)</b>, press the <b>F key</b> on the keyboard.</p>
-        <p>When the <b>MIDDLE arrow</b> points to the <b>right (>)</b>, press the <b>J key</b> on the keyboard.</p>
+        <p align="center"
+        <figure>
+        <img src = "media/flanker_example.png" width = 30%"/>
+        </figure>
+        </p>
+        <p>When the <b>MIDDLE arrow</b> points to the <b>left (<)</b>, press the <b>LEFT arrow key</b> on the keyboard.</p>
+        <p>When the <b>MIDDLE arrow</b> points to the <b>right (>)</b>, press the <b>RIGHT arrow key</b> on the keyboard.</p>
         <br>
-        <p>In this game of speed and reflex, you will need to select the correct response according to the orientation of the middle arrow as fast and as correctly as possible, while <b>resisting the surrounding arrows.</b></p>
+        <p>In this game of speed and reflex, you will need to select the correct response according to the orientation of the middle arrow as fast and as correctly as possible, while <b>resisting the surrounding arrows</b>.</p>
         <br>
         <p>You have a maximum of 2 seconds to respond to each trial.</p>
         <br>
@@ -25,87 +84,135 @@ var random_duration = function() {
 var fixation = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus:
-        "<div style='font-size:500%; position:fixed; text-align: center; top:50%; bottom:50%; right:20%; left:20%'> + </div>",
+        "<div style='font-size:80px; position:fixed; text-align: center; top:50%; bottom:50%; right:20%; left:20%'>+</div>",
     choices: ["s"],
     trial_duration: random_duration // random duration between 500 and 1000 ms
 }
 
-// shared on_finish: scores each flanker trial as correct/incorrect
 // (timed-out trials have response === null, so they count as incorrect)
 var flanker_on_finish = function(data) {
-    var correct_key = data.target_direction === 'left' ? 'f' : 'j';
+    var correct_key = data.target_direction === 'left' ? 'ArrowLeft' : 'ArrowRight';
     data.correct = data.response === correct_key;
 }
 
 var trial_congruent_l = {
   type: jsPsychHtmlKeyboardResponse,
+  on_start: function () {
+        create_marker(marker1, (color = "black"));
+        sendMarker("1");
+  },
   stimulus: "<div style='font-size:150px; position:fixed; text-align: center; top:50%; bottom:50%; right:20%; left:20%'> < < < < < </div>",
   trial_duration: 2000,
   post_trial_gap: 500,
-  choices: ['f','j'],
+  choices: ['ArrowLeft','ArrowRight'],
   data: {
     task: 'flanker',
     stimulus_type: 'congruent',
     target_direction: 'left'
   },
-  on_finish: flanker_on_finish
+  on_finish: function (data) {
+    document.querySelector("#marker1")?.remove()
+    sendMarker("0");
+  },
+   flanker_on_finish
 }
 
 var trial_congruent_r = {
   type: jsPsychHtmlKeyboardResponse,
-  stimulus: '<p style="font-size: 150px;">  >  >  >  >  >  </p>',
+  on_start: function () {
+        create_marker(marker1, (color = "black"));
+        sendMarker("1");
+  },
+  stimulus: "<div style='font-size:150px; position:fixed; text-align: center; top:50%; bottom:50%; right:20%; left:20%'> > > > > > </div>",
   trial_duration: 2000,
   post_trial_gap: 500,
-  choices: ['f','j'],
+  choices: ['ArrowLeft','ArrowRight'],
   data: {
     task: 'flanker',
     stimulus_type: 'congruent',
     target_direction: 'right'
   },
-  on_finish: flanker_on_finish
+  on_finish: function (data) {
+    document.querySelector("#marker1")?.remove()
+    sendMarker("0");
+  },
+   flanker_on_finish
 }
 
 var trial_incongruent_l = {
   type: jsPsychHtmlKeyboardResponse,
-  stimulus: '<p style="font-size: 150px;">  >  >  <  >  >  </p>',
+  on_start: function () {
+        create_marker(marker1, (color = "black"));
+        sendMarker("1");
+  },
+  stimulus: "<div style='font-size:150px; position:fixed; text-align: center; top:50%; bottom:50%; right:20%; left:20%'> > > < > > </div>",
   trial_duration: 2000,
   post_trial_gap: 500,
-  choices: ['f','j'],
+  choices: ['ArrowLeft','ArrowRight'],
   data: {
     task: 'flanker',
     stimulus_type: 'incongruent',
     target_direction: 'left'
   },
-  on_finish: flanker_on_finish
+  on_finish: function (data) {
+    document.querySelector("#marker1")?.remove()
+    sendMarker("0");
+  },
+   flanker_on_finish
 }
 
 var trial_incongruent_r = {
   type: jsPsychHtmlKeyboardResponse,
-  stimulus: '<p style="font-size: 150px;">  <  <  >  <  <  </p>',
+  on_start: function () {
+        create_marker(marker1, (color = "black"));
+        sendMarker("1");
+  },
+  stimulus: "<div style='font-size:150px; position:fixed; text-align: center; top:50%; bottom:50%; right:20%; left:20%'> < < > < < </div>",
   trial_duration: 2000,
   post_trial_gap: 500,
-  choices: ['f','j'],
+  choices: ['ArrowLeft','ArrowRight'],
   data: {
     task: 'flanker',
     stimulus_type: 'incongruent',
     target_direction: 'right'
   },
-  on_finish: flanker_on_finish
+  on_finish: function (data) {
+    document.querySelector("#marker1")?.remove()
+    sendMarker("0");
+  },
+   flanker_on_finish
+  
 }
 
-var feedback = {
-    type: jsPsychHtmlKeyboardResponse,
-    stimulus: function() {
-        var last_trial = jsPsych.data.get().last(1).values()[0];
-        if (last_trial.correct) {
-            return '<p style="color: green; font-size: 50px;">Correct</p>';
-        } else {
-            return '<p style="color: red; font-size: 50px;">Incorrect</p>';
-        }
-    },
-    choices: "NO_KEYS",
-    trial_duration: 1000,
-}
+//var trial_neutral_l = {
+  //type: jsPsychImageKeyboardResponse,
+  //stimulus: 'media/neutral_left.png',
+  //stimulus_width: 1000,
+  //trial_duration: 2000,
+  //post_trial_gap: 500,
+  //choices: ['ArrowLeft','ArrowRight'],
+  //data: {
+    //task: 'flanker',
+    //stimulus_type: 'neutral',
+    //target_direction: 'left'
+  //},
+  //on_finish: flanker_on_finish
+//}
+
+//var trial_neutral_r = {
+  //type: jsPsychImageKeyboardResponse,
+  //stimulus: 'media/neutral_right.png',
+  //stimulus_width: 1000,
+  //trial_duration: 2000,
+  //post_trial_gap: 500,
+  //choices: ['ArrowLeft','ArrowRight'],
+  //data: {
+    //task: 'flanker',
+    //stimulus_type: 'neutral',
+    //target_direction: 'right'
+  //},
+  //on_finish: flanker_on_finish
+//}
 
 var begin = {
     type: jsPsychHtmlButtonResponse,
@@ -115,11 +222,15 @@ var begin = {
     <h2><b style="color: #10db10;">Main Task</b></h2>
         <p>Now, we can move onto the main experimental trials.</p>
         <p>Again, in this task, you will see <b>5 arrows</b> presented on the screen, such as like this:</p>
-        <p style="font-size: 100px;">  <  <  <  <  <  </p>
-        <p>When the <b>MIDDLE arrow</b> points to the <b>left (<)</b>, press the <b>F key</b> on the keyboard</p>
-        <p>When the <b>MIDDLE arrow</b> points to the <b>right (>)</b>, press the <b>J key</b> on the keyboard</p>
+        <p align="center"
+        <figure>
+        <img src = "media/flanker_example.png" width = 30%"/>
+        </figure>
+        </p>
+        <p>When the <b>MIDDLE arrow</b> points to the <b>left (<)</b>, press the <b>LEFT arrow key</b> on the keyboard</p>
+        <p>When the <b>MIDDLE arrow</b> points to the <b>right (>)</b>, press the <b>RIGHT arrow key</b> on the keyboard</p>
         <br>
-        <p>In this game of speed and reflex, you will need to select the correct response according to the orientation of the middle arrow as fast and as correctly as possible, while <b>resisting the surrounding arrows.</b></p>
+        <p>In this game of speed and reflex, you will need to select the correct response according to the orientation of the middle arrow as fast and as correctly as possible, while <b>resisting the surrounding arrows</b>.</p>
         <br>
         <p>You have a maximum of 2 seconds to respond to each trial.</p>
         <br>
@@ -128,13 +239,12 @@ var begin = {
 }
 
 // builds one block of randomised trials, tagged with a block label
-// block_label can be a number (1, 2, ...) or 'practice'
 function make_block(block_label, reps) {
     var block_trials = [
         { timeline: [fixation, trial_congruent_l] },
         { timeline: [fixation, trial_congruent_r] },
         { timeline: [fixation, trial_incongruent_l] },
-        { timeline: [fixation, trial_incongruent_r] },
+        { timeline: [fixation, trial_incongruent_r] }
     ];
     return {
         timeline: jsPsych.randomization.repeat(block_trials, reps),
@@ -211,7 +321,7 @@ function get_debrief_display(results, type = "Block") {
             "<p>Your score for this block is:</p>" +
             '<p style="color: black; font-size: 48px; font-weight: bold;">' +
             Math.round(results.score) +
-            " &</p>"
+            " %</p>"
     }
 
     return {
@@ -228,12 +338,9 @@ function get_debrief_display(results, type = "Block") {
 }
 
 // Population reference values for the IES distribution (used for the percentile).
-// Replace with values from your own pilot/normative data when available.
 var flanker_ies_mean = 1000
 var flanker_ies_sd = 400
 
-// builds an end-of-block screen showing the score (Illusion Game style)
-// block_label can be a block number (1, 2, ...) or 'practice'
 function make_block_finish(block_label, is_last) {
     var is_practice = block_label === 'practice'
     return {
