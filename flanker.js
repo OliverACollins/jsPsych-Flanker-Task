@@ -62,7 +62,7 @@ var instructions = {
         <p>In this task, you will see <b>5 arrows</b> presented on the screen, such as like this:</p>
         <p align="center"
         <figure>
-        <img src = "media/flanker_example.png" width = 30%"/>
+        <img src = "images/flanker_example.png" width = 30%"/>
         </figure>
         </p>
         <p>When the <b>MIDDLE arrow</b> points to the <b>left (<)</b>, press the <b>LEFT arrow key (&larr;)</b> on the keyboard.</p>
