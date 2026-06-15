@@ -65,17 +65,20 @@ var instructions = {
         <img src = "media/flanker_example.png" width = 30%"/>
         </figure>
         </p>
-        <p>When the <b>MIDDLE arrow</b> points to the <b>left (<)</b>, press the <b>LEFT arrow key</b> on the keyboard.</p>
-        <p>When the <b>MIDDLE arrow</b> points to the <b>right (>)</b>, press the <b>RIGHT arrow key</b> on the keyboard.</p>
+        <p>When the <b>MIDDLE arrow</b> points to the <b>left (<)</b>, press the <b>LEFT arrow key (&larr;)</b> on the keyboard.</p>
+        <p>When the <b>MIDDLE arrow</b> points to the <b>right (>)</b>, press the <b>RIGHT arrow key (&rarr;)</b> on the keyboard.</p>
         <br>
-        <p>In this game of speed and reflex, you will need to select the correct response according to the orientation of the middle arrow as fast and as correctly as possible, while <b>resisting the surrounding arrows</b>.</p>
+        <p>In this game of speed and reflex, you will need to select the correct response according to the <b>orientation of the middle arrow</b> as fast and as correctly as possible, while <b>resisting the surrounding arrows</b>.</p>
         <br>
-        <p>You have a maximum of 2 seconds to respond to each trial.</p>
+        <p>You have a maximum of <b>2 seconds</b> to respond to each trial.</p>
         <br>
-        <p>You will first have a chance to practice this task. Press "Continue" to start the practice trials.</p>
+        <p>You will first have a chance to practice this task. Press "Continue" to start the practice trials. The block will begin with a <b>3 - 2 - 1</b> countdown.</p>
     `
 }
 
+// -----------------------
+// Fixation
+// -----------------------
 var random_duration = function() {
     var durations = [500, 600, 700, 800, 900, 1000];
     return durations[Math.floor(Math.random() * durations.length)];
@@ -85,16 +88,60 @@ var fixation = {
     type: jsPsychHtmlKeyboardResponse,
     stimulus:
         "<div style='font-size:80px; position:fixed; text-align: center; top:50%; bottom:50%; right:20%; left:20%'>+</div>",
-    choices: ["s"],
-    trial_duration: random_duration // random duration between 500 and 1000 ms
+    choices: "NO_KEYS",
+    data: {
+        task: 'fixation'
+    },
+    trial_duration: random_duration     // random duration between 500 and 1000 ms
 }
 
-// (timed-out trials have response === null, so they count as incorrect)
+// -----------------------
+// Scoring
+// -----------------------
 var flanker_on_finish = function(data) {
     var correct_key = data.target_direction === 'left' ? 'ArrowLeft' : 'ArrowRight';
     data.correct = data.response === correct_key;
 }
 
+// -----------------------
+// Countdown before trials
+// -----------------------
+var countdown = {
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: function () {
+        let count = 3
+        return `<p style='font-size: 100px; position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);' id='countdown'>${count}</p>`
+    },
+    choices: "NO_KEYS",
+    trial_duration: 3000,
+    on_start: function () {
+        document.body.style.backgroundColor = "#ffffff"
+        document.body.style.cursor = "none"
+        create_marker(marker1, (color = "white"))
+        let count = 3
+        let countdownInterval = setInterval(() => {
+            count--
+            if (count > 0) {
+                document.getElementById("countdown").innerText = count
+            } else {
+                clearInterval(countdownInterval)
+            }
+        }, 1000)
+    },
+    on_finish: function () {
+        document.body.style.backgroundColor = "white"
+        // Clean up markers
+        document.querySelector("#marker1")?.remove()
+        document.querySelector("#marker2")?.remove()
+    },
+    data: {
+        screen: "tap_countdown",
+    },
+}
+
+// -----------------------
+// Stimuli
+// -----------------------
 var trial_congruent_l = {
   type: jsPsychHtmlKeyboardResponse,
   on_start: function () {
@@ -214,6 +261,10 @@ var trial_incongruent_r = {
   //on_finish: flanker_on_finish
 //}
 
+
+// -----------------------
+// Begin screen (between practice and main task)
+// -----------------------
 var begin = {
     type: jsPsychHtmlButtonResponse,
     choices: ["Continue"],
@@ -221,7 +272,7 @@ var begin = {
     stimulus:`
     <h2><b style="color: #10db10;">Main Task</b></h2>
         <p>Now, we can move onto the main experimental trials.</p>
-        <p>Again, in this task, you will see <b>5 arrows</b> presented on the screen, such as like this:</p>
+        <p><i>Again</i>, in this task, you will see <b>5 arrows</b> presented on the screen, such as like this:</p>
         <p align="center"
         <figure>
         <img src = "media/flanker_example.png" width = 30%"/>
@@ -230,15 +281,17 @@ var begin = {
         <p>When the <b>MIDDLE arrow</b> points to the <b>left (<)</b>, press the <b>LEFT arrow key</b> on the keyboard</p>
         <p>When the <b>MIDDLE arrow</b> points to the <b>right (>)</b>, press the <b>RIGHT arrow key</b> on the keyboard</p>
         <br>
-        <p>In this game of speed and reflex, you will need to select the correct response according to the orientation of the middle arrow as fast and as correctly as possible, while <b>resisting the surrounding arrows</b>.</p>
+        <p>In this game of speed and reflex, you will need to select the correct response according to the <b>orientation of the middle arrow</b> as fast and as correctly as possible, while <b>resisting the surrounding arrows</b>.</p>
         <br>
         <p>You have a maximum of 2 seconds to respond to each trial.</p>
         <br>
-        <p>Press "Continue" to start the experimental trials.</p>
+        <p>Press "Continue" to start the experimental trials. Each block will begin with a <b>3 - 2 - 1</b> countdown.</p>
     `
 }
 
-// builds one block of randomised trials, tagged with a block label
+// -----------------------
+// Block builder
+// -----------------------
 function make_block(block_label, reps) {
     var block_trials = [
         { timeline: [fixation, trial_congruent_l] },
@@ -247,12 +300,14 @@ function make_block(block_label, reps) {
         { timeline: [fixation, trial_incongruent_r] }
     ];
     return {
-        timeline: jsPsych.randomization.repeat(block_trials, reps),
+        timeline: [countdown, ...jsPsych.randomization.repeat(block_trials, reps)],
         data: { block: block_label }
     };
 }
 
-// Math utilities =================================================================================
+// -----------------------
+// Maths utilities
+// -----------------------
 function cumulative_probability(x, mean, sd) {
     var z = (x - mean) / Math.sqrt(2 * sd * sd)
     var t = 1 / (1 + 0.3275911 * Math.abs(z))
