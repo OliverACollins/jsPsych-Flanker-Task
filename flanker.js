@@ -9,7 +9,7 @@ function syncLSL() {
             let offsets = []
             for (let i = 0; i < 3; i++) {
                 var startPerf = performance.now()
-                let resp = await fetch("http://192.168.46.216:5000/sync", { cache: "no-store" }) // change IPv4 address as appropriate
+                let resp = await fetch("http://192.168.0.18:5000/sync", { cache: "no-store" }) // change IPv4 address as appropriate
                 let text = await resp.text()
                 var lslTime = parseFloat(text)
                 var endPerf = performance.now()
@@ -31,7 +31,7 @@ function sendMarker(value = "1") {
     // If not synced, still send marker (server will timestamp with local_clock())
     if (lslBaseTime === null) {
         console.warn("LSL not synced yet - sending without JS timestamp")
-        fetch("http://192.168.46.216:5000/marker?value=" + encodeURIComponent(value)) // change IPv4 address as appropriate
+        fetch("http://192.168.0.18:5000/marker?value=" + encodeURIComponent(value)) // change IPv4 address as appropriate
             .then(function () {
                 console.log("sent marker (no-ts)", value)
             })
@@ -42,7 +42,7 @@ function sendMarker(value = "1") {
     }
 
     var ts = lslBaseTime + performance.now() / 1000
-    var url = "http://192.168.46.216:5000/marker?value=" + encodeURIComponent(value) + "&ts=" + encodeURIComponent(ts) // change IPv4 address as appropriate
+    var url = "http://192.168.0.18:5000/marker?value=" + encodeURIComponent(value) + "&ts=" + encodeURIComponent(ts) // change IPv4 address as appropriate
     fetch(url)
         .then(function () {
             console.log("sent marker", value, "ts", ts)
@@ -149,7 +149,6 @@ var trial_congruent_l = {
         sendMarker("1");
   },
   stimulus: "<div style='font-size:150px; position:fixed; text-align: center; top:50%; bottom:50%; right:20%; left:20%'> < < < < < </div>",
-  trial_duration: 2000,
   post_trial_gap: 500,
   choices: ['ArrowLeft','ArrowRight'],
   data: {
@@ -159,9 +158,9 @@ var trial_congruent_l = {
   },
   on_finish: function (data) {
     document.querySelector("#marker1")?.remove()
-    sendMarker("0");
+    sendMarker("0")
+    flanker_on_finish(data)
   },
-   flanker_on_finish
 }
 
 var trial_congruent_r = {
@@ -171,7 +170,6 @@ var trial_congruent_r = {
         sendMarker("1");
   },
   stimulus: "<div style='font-size:150px; position:fixed; text-align: center; top:50%; bottom:50%; right:20%; left:20%'> > > > > > </div>",
-  trial_duration: 2000,
   post_trial_gap: 500,
   choices: ['ArrowLeft','ArrowRight'],
   data: {
@@ -181,9 +179,9 @@ var trial_congruent_r = {
   },
   on_finish: function (data) {
     document.querySelector("#marker1")?.remove()
-    sendMarker("0");
+    sendMarker("0")
+    flanker_on_finish(data)
   },
-   flanker_on_finish
 }
 
 var trial_incongruent_l = {
@@ -193,7 +191,6 @@ var trial_incongruent_l = {
         sendMarker("1");
   },
   stimulus: "<div style='font-size:150px; position:fixed; text-align: center; top:50%; bottom:50%; right:20%; left:20%'> > > < > > </div>",
-  trial_duration: 2000,
   post_trial_gap: 500,
   choices: ['ArrowLeft','ArrowRight'],
   data: {
@@ -203,9 +200,9 @@ var trial_incongruent_l = {
   },
   on_finish: function (data) {
     document.querySelector("#marker1")?.remove()
-    sendMarker("0");
+    sendMarker("0")
+    flanker_on_finish(data)
   },
-   flanker_on_finish
 }
 
 var trial_incongruent_r = {
@@ -215,7 +212,6 @@ var trial_incongruent_r = {
         sendMarker("1");
   },
   stimulus: "<div style='font-size:150px; position:fixed; text-align: center; top:50%; bottom:50%; right:20%; left:20%'> < < > < < </div>",
-  trial_duration: 2000,
   post_trial_gap: 500,
   choices: ['ArrowLeft','ArrowRight'],
   data: {
@@ -225,9 +221,9 @@ var trial_incongruent_r = {
   },
   on_finish: function (data) {
     document.querySelector("#marker1")?.remove()
-    sendMarker("0");
+    sendMarker("0")
+    flanker_on_finish(data)
   },
-   flanker_on_finish
   
 }
 
@@ -275,7 +271,7 @@ var begin = {
         <p><i>Again</i>, in this task, you will see <b>5 arrows</b> presented on the screen, such as like this:</p>
         <p align="center"
         <figure>
-        <img src = "media/flanker_example.png" width = 30%"/>
+        <img src = "images/flanker_example.png" width = 30%"/>
         </figure>
         </p>
         <p>When the <b>MIDDLE arrow</b> points to the <b>left (<)</b>, press the <b>LEFT arrow key</b> on the keyboard</p>
@@ -401,6 +397,9 @@ function make_block_finish(block_label, is_last) {
     return {
         type: jsPsychHtmlButtonResponse,
         choices: ["Continue"],
+        on_start: function() {
+            document.body.style.cursor = "auto"
+        },
         stimulus: function() {
             var results = get_results(flanker_ies_mean, flanker_ies_sd, block_label)
             var show_screen = get_debrief_display(results, is_last ? "Final" : "Block")
